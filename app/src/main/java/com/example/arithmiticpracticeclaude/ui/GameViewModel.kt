@@ -28,6 +28,9 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
     private val _sessionEnded = MutableStateFlow(false)
     val sessionEnded: StateFlow<Boolean> = _sessionEnded.asStateFlow()
 
+    val achievementManager = AchievementManager()
+    val newAchievements: StateFlow<List<UnlockedAchievement>> = achievementManager.newAchievements
+
     init {
         loadGameState()
     }
@@ -145,15 +148,32 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
         val newStreak = if (isCorrect) currentState.currentStreak + 1 else 0
         val newBestStreak = maxOf(currentState.bestStreak, newStreak)
 
-        _gameState.value = currentState.copy(
+        val updatedGameState = currentState.copy(
             currentLevel = newLevel,
             totalScore = newTotalScore,
             currentSessionScore = newScore,
             currentSessionQuestions = newQuestionsAnswered,
             currentSessionCorrect = newCorrectAnswers,
             currentStreak = newStreak,
-            bestStreak = newBestStreak
+            bestStreak = newBestStreak,
+            totalQuestionsAnswered = currentState.totalQuestionsAnswered + 1,
+            totalCorrectAnswers = if (isCorrect) currentState.totalCorrectAnswers + 1 else currentState.totalCorrectAnswers,
+            averageAccuracy = if (currentState.totalQuestionsAnswered + 1 > 0) {
+                ((if (isCorrect) currentState.totalCorrectAnswers + 1 else currentState.totalCorrectAnswers).toFloat() /
+                 (currentState.totalQuestionsAnswered + 1)) * 100
+            } else 0f
         )
+
+        _gameState.value = updatedGameState
+
+        // Check achievements
+        if (isCorrect) {
+            achievementManager.markCorrectAnswer()
+        }
+        if (newLevel > currentState.currentLevel) {
+            achievementManager.markLevelUp()
+        }
+        achievementManager.checkAchievements(updatedGameState, session)
 
         // Create question result
         val result = QuestionResult(
@@ -244,6 +264,10 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
     fun endSession() {
         val session = _currentSession.value ?: return
         val endedSession = session.copy(endTime = System.currentTimeMillis())
+
+        // Mark session completion for achievements
+        achievementManager.markSessionComplete(endedSession)
+        achievementManager.checkAchievements(_gameState.value, endedSession)
 
         viewModelScope.launch {
             repository.completeSession(endedSession, _gameState.value)

@@ -24,6 +24,7 @@ import com.example.arithmiticpracticeclaude.data.GameRepository
 import com.example.arithmiticpracticeclaude.data.League
 import com.example.arithmiticpracticeclaude.ui.GameViewModel
 import com.example.arithmiticpracticeclaude.ui.GameViewModelFactory
+import com.example.arithmiticpracticeclaude.ui.HapticManager
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,10 +32,13 @@ import kotlin.math.roundToInt
 fun MainMenuScreen(
     onStartSession: () -> Unit,
     onViewStatistics: () -> Unit,
+    onViewAchievements: (() -> Unit)? = null,
+    onViewSettings: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val repository = remember { GameRepository(context) }
+    val hapticManager = remember { HapticManager(context) }
     val viewModel: GameViewModel = viewModel(
         factory = GameViewModelFactory(repository)
     )
@@ -128,7 +132,10 @@ fun MainMenuScreen(
             ) {
                 // Start Session Button
                 Button(
-                    onClick = onStartSession,
+                    onClick = {
+                        hapticManager.buttonPressFeedback()
+                        onStartSession()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(64.dp),
@@ -156,7 +163,10 @@ fun MainMenuScreen(
 
                 // Statistics Button
                 OutlinedButton(
-                    onClick = onViewStatistics,
+                    onClick = {
+                        hapticManager.buttonPressFeedback()
+                        onViewStatistics()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
@@ -175,6 +185,64 @@ fun MainMenuScreen(
                             text = "View Statistics",
                             style = MaterialTheme.typography.titleMedium
                         )
+                    }
+                }
+
+                // Achievements Button
+                if (onViewAchievements != null) {
+                    OutlinedButton(
+                        onClick = {
+                            hapticManager.buttonPressFeedback()
+                            onViewAchievements()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Achievements",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                }
+
+                // Settings Button
+                if (onViewSettings != null) {
+                    OutlinedButton(
+                        onClick = {
+                            hapticManager.buttonPressFeedback()
+                            onViewSettings()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Settings",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
                     }
                 }
             }

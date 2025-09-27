@@ -21,6 +21,8 @@ import com.example.arithmiticpracticeclaude.ui.screens.MainMenuScreen
 import com.example.arithmiticpracticeclaude.ui.screens.CompactGameScreen
 import com.example.arithmiticpracticeclaude.ui.screens.CompactSessionSummaryScreen
 import com.example.arithmiticpracticeclaude.ui.screens.StatisticsScreen
+import com.example.arithmiticpracticeclaude.ui.screens.AchievementsScreen
+import com.example.arithmiticpracticeclaude.ui.screens.SettingsScreen
 import com.example.arithmiticpracticeclaude.ui.theme.ArithmeticPracticeTheme
 
 class MainActivity : ComponentActivity() {
@@ -52,6 +54,12 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onViewStatistics = {
                                         navController.navigate("statistics")
+                                    },
+                                    onViewAchievements = {
+                                        navController.navigate("achievements")
+                                    },
+                                    onViewSettings = {
+                                        navController.navigate("settings")
                                     }
                                 )
                             }
@@ -85,6 +93,22 @@ class MainActivity : ComponentActivity() {
 
                             composable("statistics") {
                                 StatisticsScreen(
+                                    onBack = {
+                                        navController.popBackStack()
+                                    }
+                                )
+                            }
+
+                            composable("achievements") {
+                                AchievementsScreen(
+                                    onBack = {
+                                        navController.popBackStack()
+                                    }
+                                )
+                            }
+
+                            composable("settings") {
+                                SettingsScreen(
                                     onBack = {
                                         navController.popBackStack()
                                     }

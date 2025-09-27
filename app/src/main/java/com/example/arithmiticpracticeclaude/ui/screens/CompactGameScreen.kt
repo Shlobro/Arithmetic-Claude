@@ -26,6 +26,11 @@ import com.example.arithmiticpracticeclaude.data.GameRepository
 import com.example.arithmiticpracticeclaude.data.League
 import com.example.arithmiticpracticeclaude.ui.GameViewModel
 import com.example.arithmiticpracticeclaude.ui.GameViewModelFactory
+import com.example.arithmiticpracticeclaude.ui.SoundManager
+import com.example.arithmiticpracticeclaude.ui.HapticManager
+import com.example.arithmiticpracticeclaude.ui.animations.ConfettiEffect
+import com.example.arithmiticpracticeclaude.ui.animations.CelebrationStars
+import com.example.arithmiticpracticeclaude.ui.animations.ShakeEffect
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -37,6 +42,8 @@ fun CompactGameScreen(
 ) {
     val context = LocalContext.current
     val repository = remember { GameRepository(context) }
+    val soundManager = remember { SoundManager(context) }
+    val hapticManager = remember { HapticManager(context) }
     val viewModel: GameViewModel = viewModel(
         factory = GameViewModelFactory(repository)
     )
@@ -47,6 +54,7 @@ fun CompactGameScreen(
     val showResult by viewModel.showResult.collectAsState()
     val lastResult by viewModel.lastResult.collectAsState()
     val sessionEnded by viewModel.sessionEnded.collectAsState()
+    val newAchievements by viewModel.newAchievements.collectAsState()
 
     var userAnswer by remember { mutableStateOf("") }
     val timerDuration = League.getTimerForScore(gameState.totalScore)
@@ -81,23 +89,53 @@ fun CompactGameScreen(
         }
     }
 
+    // Sound and Haptic Feedback Effect
+    LaunchedEffect(lastResult, showResult) {
+        if (showResult && lastResult != null) {
+            if (lastResult!!.isCorrect) {
+                soundManager.playCorrectSound()
+                hapticManager.correctAnswerFeedback()
+            } else {
+                soundManager.playIncorrectSound()
+                hapticManager.incorrectAnswerFeedback()
+            }
+        }
+    }
+
+    // Level Up Effect
+    LaunchedEffect(gameState.currentLevel) {
+        // Check if level increased (excluding first load)
+        if (gameState.currentLevel > 1) {
+            soundManager.playLevelUpSound()
+            hapticManager.levelUpFeedback()
+        }
+    }
+
+    // Cleanup sound resources
+    DisposableEffect(Unit) {
+        onDispose {
+            soundManager.release()
+        }
+    }
+
     val currentLeague = League.getLeagueForScore(gameState.totalScore)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surface,
-                        Color(currentLeague.color).copy(alpha = 0.05f)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.surface,
+                            Color(currentLeague.color).copy(alpha = 0.05f)
+                        )
                     )
                 )
-            )
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceEvenly
-    ) {
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly
+        ) {
         // Compact Header
         CompactHeaderCard(
             league = currentLeague,
@@ -139,6 +177,7 @@ fun CompactGameScreen(
 
             Button(
                 onClick = {
+                    hapticManager.buttonPressFeedback()
                     val answer = userAnswer.toIntOrNull()
                     if (answer != null) {
                         viewModel.submitAnswer(answer)
@@ -158,25 +197,44 @@ fun CompactGameScreen(
             }
         }
 
-        // Result Display
+        // Auto-proceed to next question when result is shown
+        LaunchedEffect(showResult) {
+            if (showResult && lastResult != null) {
+                delay(if (lastResult!!.isCorrect) 1500 else 2000) // Show feedback briefly
+                val questionsCount = currentSession?.questionsAnswered ?: 0
+                if (questionsCount < 10 && !sessionEnded) {
+                    viewModel.nextQuestion()
+                    userAnswer = ""
+                }
+            }
+        }
+        }
+
+        // Achievement Notification Overlay positioned at top
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+        ) {
+            AchievementNotificationOverlay(
+                newAchievements = newAchievements,
+                onDismiss = {
+                    viewModel.achievementManager.clearNewAchievements()
+                }
+            )
+        }
+
+        // Bottom feedback display
         lastResult?.let { result ->
             AnimatedVisibility(
                 visible = showResult,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut()
+                enter = slideInVertically(
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
+                ) { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter)
             ) {
-                CompactResultCard(
-                    result = result,
-                    onNext = {
-                        // Only continue if session isn't complete
-                        val questionsCount = currentSession?.questionsAnswered ?: 0
-                        if (questionsCount < 10 && !sessionEnded) {
-                            viewModel.nextQuestion()
-                            userAnswer = ""
-                        }
-                        // If session is complete, the sessionEnded effect will handle navigation
-                    }
-                )
+                BottomFeedbackCard(result = result)
             }
         }
     }
@@ -303,8 +361,13 @@ fun CompactQuestionCard(
     AnimatedContent(
         targetState = question.text,
         transitionSpec = {
-            slideInHorizontally { it } + fadeIn() with
-            slideOutHorizontally { -it } + fadeOut()
+            slideInHorizontally { it } + fadeIn() + scaleIn(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            ) with
+            slideOutHorizontally { -it } + fadeOut() + scaleOut()
         }
     ) { questionText ->
         Card(
@@ -338,11 +401,44 @@ fun CompactResultCard(
     val backgroundColor = if (result.isCorrect) Color(0xFF4CAF50) else Color(0xFFF44336)
     val icon = if (result.isCorrect) Icons.Default.CheckCircle else Icons.Default.Close
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        shape = RoundedCornerShape(16.dp)
-    ) {
+    var showParticles by remember { mutableStateOf(false) }
+    var showShake by remember { mutableStateOf(false) }
+
+    LaunchedEffect(result.isCorrect) {
+        if (result.isCorrect) {
+            showParticles = true
+            delay(100)
+            showParticles = false
+        } else {
+            showShake = true
+            delay(300)
+            showShake = false
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // Background particle effects for correct answers
+        if (result.isCorrect) {
+            ConfettiEffect(
+                isVisible = showParticles,
+                modifier = Modifier.fillMaxWidth()
+            )
+            CelebrationStars(
+                isVisible = showParticles,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Apply shake effect for incorrect answers
+        ShakeEffect(
+            isActive = showShake,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = backgroundColor),
+                shape = RoundedCornerShape(16.dp)
+            ) {
         Column(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -389,15 +485,69 @@ fun CompactResultCard(
                 }
             }
 
-            Button(
-                onClick = onNext,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White.copy(alpha = 0.2f),
-                    contentColor = Color.White
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue", fontWeight = FontWeight.Medium)
+            // Auto-continue after delay
+            LaunchedEffect(result) {
+                delay(if (result.isCorrect) 1500 else 2500) // Longer delay for incorrect answers to read correct answer
+                onNext()
+            }
+        }
+            }
+        }
+    }
+}
+
+@Composable
+fun BottomFeedbackCard(
+    result: com.example.arithmiticpracticeclaude.data.QuestionResult
+) {
+    val backgroundColor = if (result.isCorrect) Color(0xFF4CAF50) else Color(0xFFF44336)
+    val icon = if (result.isCorrect) Icons.Default.CheckCircle else Icons.Default.Close
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = Color.White
+            )
+
+            Text(
+                text = if (result.isCorrect) "Correct!" else "Incorrect",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (!result.isCorrect) {
+                Text(
+                    text = "Answer: ${result.correctAnswer}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+
+            if (result.scoreChange != 0) {
+                Text(
+                    text = "${if (result.scoreChange > 0) "+" else ""}${result.scoreChange} pts",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }
