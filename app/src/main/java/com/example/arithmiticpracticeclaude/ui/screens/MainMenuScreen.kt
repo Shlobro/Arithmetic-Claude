@@ -34,6 +34,7 @@ fun MainMenuScreen(
     onViewStatistics: () -> Unit,
     onViewAchievements: (() -> Unit)? = null,
     onViewSettings: (() -> Unit)? = null,
+    onViewLeaderboard: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -83,10 +84,16 @@ fun MainMenuScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Master",
+                    text = "League",
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Light,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = Color(currentLeague.color)
+                )
+                Text(
+                    text = "🏆 Compete Globally 🏆",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                 )
             }
         }
@@ -185,6 +192,40 @@ fun MainMenuScreen(
                             text = "View Statistics",
                             style = MaterialTheme.typography.titleMedium
                         )
+                    }
+                }
+
+                // Leaderboard Button - Featured as second button
+                if (onViewLeaderboard != null) {
+                    Button(
+                        onClick = {
+                            hapticManager.buttonPressFeedback()
+                            onViewLeaderboard()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(currentLeague.color).copy(alpha = 0.8f),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Global Leaderboard",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 

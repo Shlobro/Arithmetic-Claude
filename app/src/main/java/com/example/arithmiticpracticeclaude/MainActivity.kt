@@ -12,17 +12,24 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.arithmiticpracticeclaude.data.GameSession
 import com.example.arithmiticpracticeclaude.data.GameState
+import com.example.arithmiticpracticeclaude.data.GameRepository
+import com.example.arithmiticpracticeclaude.ui.GameViewModel
+import com.example.arithmiticpracticeclaude.ui.GameViewModelFactory
 import com.example.arithmiticpracticeclaude.ui.screens.MainMenuScreen
 import com.example.arithmiticpracticeclaude.ui.screens.CompactGameScreen
 import com.example.arithmiticpracticeclaude.ui.screens.CompactSessionSummaryScreen
 import com.example.arithmiticpracticeclaude.ui.screens.StatisticsScreen
 import com.example.arithmiticpracticeclaude.ui.screens.AchievementsScreen
 import com.example.arithmiticpracticeclaude.ui.screens.SettingsScreen
+import com.example.arithmiticpracticeclaude.ui.screens.PlacementTestScreen
+import com.example.arithmiticpracticeclaude.ui.screens.LeaderboardScreen
 import com.example.arithmiticpracticeclaude.ui.theme.ArithmeticPracticeTheme
 
 class MainActivity : ComponentActivity() {
@@ -32,9 +39,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ArithmeticPracticeTheme {
+                val context = LocalContext.current
+                val repository = remember { GameRepository(context) }
+                val gameViewModel: GameViewModel = viewModel(
+                    factory = GameViewModelFactory(repository)
+                )
+                val gameState by gameViewModel.gameState.collectAsState()
+
                 val navController = rememberNavController()
                 var completedSession by remember { mutableStateOf<GameSession?>(null) }
                 var completedGameState by remember { mutableStateOf<GameState?>(null) }
+
+                // Determine starting destination based on placement completion
+                val startDestination = if (gameState.hasCompletedPlacement) "menu" else "placement"
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Surface(
@@ -45,8 +62,17 @@ class MainActivity : ComponentActivity() {
                     ) {
                         NavHost(
                             navController = navController,
-                            startDestination = "menu"
+                            startDestination = startDestination
                         ) {
+                            composable("placement") {
+                                PlacementTestScreen(
+                                    onPlacementComplete = { placedLeague, finalScore ->
+                                        navController.navigate("menu") {
+                                            popUpTo("placement") { inclusive = true }
+                                        }
+                                    }
+                                )
+                            }
                             composable("menu") {
                                 MainMenuScreen(
                                     onStartSession = {
@@ -60,6 +86,9 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onViewSettings = {
                                         navController.navigate("settings")
+                                    },
+                                    onViewLeaderboard = {
+                                        navController.navigate("leaderboard")
                                     }
                                 )
                             }
@@ -109,6 +138,14 @@ class MainActivity : ComponentActivity() {
 
                             composable("settings") {
                                 SettingsScreen(
+                                    onBack = {
+                                        navController.popBackStack()
+                                    }
+                                )
+                            }
+
+                            composable("leaderboard") {
+                                LeaderboardScreen(
                                     onBack = {
                                         navController.popBackStack()
                                     }

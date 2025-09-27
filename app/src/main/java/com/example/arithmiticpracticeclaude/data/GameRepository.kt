@@ -23,6 +23,9 @@ class GameRepository(private val context: Context) {
         val GAME_MODE = stringPreferencesKey("game_mode")
         val SESSIONS_COMPLETED = intPreferencesKey("sessions_completed")
         val TOTAL_PLAY_TIME = longPreferencesKey("total_play_time")
+        val HAS_COMPLETED_PLACEMENT = booleanPreferencesKey("has_completed_placement")
+        val PLACEMENT_SCORE = longPreferencesKey("placement_score")
+        val INITIAL_LEAGUE = stringPreferencesKey("initial_league")
     }
 
     suspend fun saveGameState(gameState: GameState) {
@@ -35,6 +38,9 @@ class GameRepository(private val context: Context) {
             preferences[PreferencesKeys.AVERAGE_ACCURACY] = gameState.averageAccuracy
             preferences[PreferencesKeys.LAST_SESSION_END] = gameState.lastSessionEnd
             preferences[PreferencesKeys.GAME_MODE] = gameState.gameMode
+            preferences[PreferencesKeys.HAS_COMPLETED_PLACEMENT] = gameState.hasCompletedPlacement
+            preferences[PreferencesKeys.PLACEMENT_SCORE] = gameState.placementScore
+            preferences[PreferencesKeys.INITIAL_LEAGUE] = gameState.initialLeague
         }
     }
 
@@ -47,7 +53,10 @@ class GameRepository(private val context: Context) {
             bestStreak = preferences[PreferencesKeys.BEST_STREAK] ?: 0,
             averageAccuracy = preferences[PreferencesKeys.AVERAGE_ACCURACY] ?: 0f,
             lastSessionEnd = preferences[PreferencesKeys.LAST_SESSION_END] ?: 0L,
-            gameMode = preferences[PreferencesKeys.GAME_MODE] ?: "Addition"
+            gameMode = preferences[PreferencesKeys.GAME_MODE] ?: "Addition",
+            hasCompletedPlacement = preferences[PreferencesKeys.HAS_COMPLETED_PLACEMENT] ?: false,
+            placementScore = preferences[PreferencesKeys.PLACEMENT_SCORE] ?: 0L,
+            initialLeague = preferences[PreferencesKeys.INITIAL_LEAGUE] ?: "Rookie"
         )
     }
 

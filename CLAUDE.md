@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an Android arithmetic practice app built with Kotlin and Jetpack Compose. The app provides a simple game interface for practicing basic math operations (addition, subtraction, multiplication, and fill-in-the-blank questions).
+This is a competitive league-based Android arithmetic practice app built with Kotlin and Jetpack Compose. The app features a sophisticated placement system and global competition framework where users compete for high scores across 23 different skill leagues, from beginner-friendly to impossibly difficult levels designed to challenge even mathematical geniuses.
 
 ## Common Development Commands
 
@@ -33,21 +33,58 @@ This is an Android arithmetic practice app built with Kotlin and Jetpack Compose
 
 ### Project Structure
 - **Package**: `com.example.arithmiticpracticeclaude`
-- **Main Activity**: `MainActivity.kt` - Entry point that sets up Compose UI
-- **Game Screen**: `ui/screens/SimpleGameScreen.kt` - Contains the main game logic and UI
-- **Theme**: `ui/theme/` - Contains Color, Type, and Theme definitions
+- **Main Activity**: `MainActivity.kt` - Entry point with navigation and placement flow
+- **Core Screens**:
+  - `PlacementTestScreen.kt` - One-time skill assessment for new users
+  - `SimpleGameScreen.kt` / `CompactGameScreen.kt` - Main game interface
+  - `LeaderboardScreen.kt` - Global competition rankings
+  - `MainMenuScreen.kt` - League-themed home screen
+- **Data Layer**: `data/` - Game state, leagues, placement test logic
+- **Theme**: `ui/theme/` - Material3 theming with league-specific colors
 
 ### Key Components
-- `SimpleGameScreen` - Main composable containing game state and UI
-- `ArithmeticQuestion` - Data class representing a math question
-- Question generators for different operation types (addition, subtraction, multiplication, fill-in-blank)
+- **League System**: 23 leagues from Rookie to Eternal with progressive difficulty
+- **Placement Test**: Adaptive algorithm determining initial league placement
+- **Competitive Scoring**: League-based point system with speed bonuses
+- **Question Generation**: Dynamic difficulty based on current league
+- **Global Leaderboard**: Score comparison and ranking system
 
 ### Game Features
-- Score tracking
-- Multiple question types (addition, subtraction, multiplication, fill-in-blank)
-- Immediate feedback with correct/incorrect indication
-- Question counter
+- **One-Time Placement**: Permanent skill-based league assignment
+- **Progressive Difficulty**:
+  - Rookie: Simple addition (1-20), 25 seconds
+  - Eternal: Complex operations (1-10M), 5 seconds
+- **Competitive Elements**:
+  - Global score comparison
+  - League progression tracking
+  - Time-based scoring bonuses
+- **Adaptive Gameplay**: Timer and difficulty scale with league
+- **Achievement System**: League-based milestones and progression
 
 ## Development Notes
 
-The app uses a single-screen architecture with all game logic contained in `SimpleGameScreen.kt`. State management is handled using Compose's `remember` and `mutableStateOf`. The UI follows Material3 design principles with proper theming structure in place.
+The app uses a multi-screen navigation architecture with Jetpack Navigation Compose. Key architectural decisions:
+
+- **Conditional Start Destination**: New users see placement test, returning users go to main menu
+- **State Management**: Uses ViewModels with StateFlow for reactive UI updates
+- **Data Persistence**: Android DataStore for game state and league progression
+- **Competitive Design**: UI emphasizes league status and global competition
+- **Responsive Difficulty**: Question generation and timing adapt to user's league
+
+### League System Design
+
+The competitive league system is the core feature:
+
+1. **Placement Flow**: One-time adaptive test determines initial league
+2. **Score Progression**: Total lifetime score determines current league
+3. **Difficulty Scaling**: Each league has specific operations, number ranges, and time limits
+4. **Competitive Scoring**: Higher leagues provide exponentially more points
+5. **Global Competition**: Leaderboard system for score comparison
+
+### Navigation Flow
+
+- **First Launch**: `placement` → `menu` → `game` → `summary`
+- **Returning Users**: `menu` → `game` → `summary`
+- **Additional Screens**: `statistics`, `achievements`, `leaderboard`, `settings`
+
+The app balances accessibility for children (ages 8-10 in Rookie league) with extreme challenges for mathematical experts (Eternal league with 5-second timeouts and million-digit calculations).

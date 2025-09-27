@@ -61,8 +61,8 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
 
     fun startNewSession() {
         val currentState = _gameState.value
-        // Auto-select game mode based on level
-        val autoSelectedMode = selectGameModeForLevel(currentState.currentLevel)
+        // Auto-select game mode based on total score (league)
+        val autoSelectedMode = selectGameModeForLevel(currentState.totalScore)
 
         val session = GameSession(
             startingLevel = currentState.currentLevel,
@@ -81,36 +81,9 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
         generateNewQuestion()
     }
 
-    private fun selectGameModeForLevel(level: Int): String {
-        return when {
-            level <= 2 -> "Addition"
-            level <= 4 -> if (Random.nextBoolean()) "Addition" else "Subtraction"
-            level <= 6 -> when (Random.nextInt(3)) {
-                0 -> "Addition"
-                1 -> "Subtraction"
-                else -> "Fill Blank"
-            }
-            level <= 8 -> when (Random.nextInt(4)) {
-                0 -> "Addition"
-                1 -> "Subtraction"
-                2 -> "Fill Blank"
-                else -> "Multiplication"
-            }
-            level <= 12 -> when (Random.nextInt(5)) {
-                0 -> "Addition"
-                1 -> "Subtraction"
-                2 -> "Fill Blank"
-                3 -> "Multiplication"
-                else -> "Division"
-            }
-            else -> when (Random.nextInt(5)) {
-                0 -> "Addition"
-                1 -> "Subtraction"
-                2 -> "Fill Blank"
-                3 -> "Multiplication"
-                else -> "Division"
-            }
-        }
+    private fun selectGameModeForLevel(totalScore: Long): String {
+        val allowedOperations = League.getOperationsForScore(totalScore)
+        return allowedOperations.random()
     }
 
     fun submitAnswer(userAnswer: Int) {
@@ -120,17 +93,43 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
 
         val isCorrect = userAnswer == question.answer
         val currentState = _gameState.value
-        val difficulty = DynamicDifficulty.fromLevel(currentState.currentLevel)
+        val league = League.getLeagueForScore(currentState.totalScore)
 
-        // Calculate score change
         val baseScore = if (isCorrect) {
-            (10 * difficulty.bonusMultiplier).toInt()
+            // Higher leagues give more points per correct answer
+            when {
+                league.name.contains("Rookie") -> 10
+                league.name.contains("Bronze") -> 25
+                league.name.contains("Silver") -> 50
+                league.name.contains("Gold") -> 100
+                league.name.contains("Platinum") -> 200
+                league.name.contains("Diamond") -> 500
+                league.name.contains("Master") -> 1000
+                league.name.contains("Grandmaster") -> 2500
+                league.name.contains("Eternal") -> 5000
+                else -> 50
+            }
         } else {
-            -5 // Penalty for wrong answer
+            // Small penalty for wrong answers (to prevent abuse)
+            -5
         }
 
-        val timeBonus = if (isCorrect && responseTime < 10000) { // Under 10 seconds
-            ((10000 - responseTime) / 1000).toInt() * 2
+        // Massive time bonus for fast answers in higher leagues
+        val timeBonus = if (isCorrect && responseTime < league.timeLimit * 800) { // Under 80% of time limit
+            val speedMultiplier = when {
+                league.name.contains("Rookie") -> 1
+                league.name.contains("Bronze") -> 2
+                league.name.contains("Silver") -> 3
+                league.name.contains("Gold") -> 5
+                league.name.contains("Platinum") -> 8
+                league.name.contains("Diamond") -> 15
+                league.name.contains("Master") -> 25
+                league.name.contains("Grandmaster") -> 50
+                league.name.contains("Eternal") -> 100
+                else -> 1
+            }
+            val timeLeftRatio = (league.timeLimit * 1000 - responseTime).toFloat() / (league.timeLimit * 1000)
+            (baseScore * timeLeftRatio * speedMultiplier).toInt()
         } else 0
 
         val scoreChange = baseScore + timeBonus
@@ -240,18 +239,19 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
 
     private fun generateNewQuestion() {
         val currentState = _gameState.value
-        val difficulty = DynamicDifficulty.fromLevel(currentState.currentLevel)
+        val league = League.getLeagueForScore(currentState.totalScore)
+        val numberRange = league.numberRange
 
-        // Auto-select mode for each question based on current level
-        val selectedMode = selectGameModeForLevel(currentState.currentLevel)
+        // Auto-select mode for each question based on current league
+        val selectedMode = selectGameModeForLevel(currentState.totalScore)
 
         val question = when (selectedMode) {
-            "Addition" -> generateAdditionQuestion(difficulty)
-            "Subtraction" -> generateSubtractionQuestion(difficulty)
-            "Multiplication" -> generateMultiplicationQuestion(difficulty)
-            "Division" -> generateDivisionQuestion(difficulty)
-            "Fill Blank" -> generateFillInBlankQuestion(difficulty)
-            else -> generateAdditionQuestion(difficulty)
+            "Addition" -> generateAdditionQuestion(numberRange)
+            "Subtraction" -> generateSubtractionQuestion(numberRange)
+            "Multiplication" -> generateMultiplicationQuestion(numberRange)
+            "Division" -> generateDivisionQuestion(numberRange)
+            "Fill Blank" -> generateFillInBlankQuestion(numberRange)
+            else -> generateAdditionQuestion(numberRange)
         }
 
         // Update the gameMode in state to reflect current question
@@ -283,39 +283,42 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
     }
 
     // Question generation functions
-    private fun generateAdditionQuestion(difficulty: DynamicDifficulty): ArithmeticQuestion {
-        val a = Random.nextInt(difficulty.baseRange.first, difficulty.baseRange.last + 1)
-        val b = Random.nextInt(difficulty.baseRange.first, difficulty.baseRange.last + 1)
+    private fun generateAdditionQuestion(numberRange: IntRange): ArithmeticQuestion {
+        val a = Random.nextInt(numberRange.first, numberRange.last + 1)
+        val b = Random.nextInt(numberRange.first, numberRange.last + 1)
         return ArithmeticQuestion("$a + $b = ?", a + b)
     }
 
-    private fun generateSubtractionQuestion(difficulty: DynamicDifficulty): ArithmeticQuestion {
-        val a = Random.nextInt(difficulty.baseRange.first + 5, difficulty.baseRange.last + 1)
-        val b = Random.nextInt(difficulty.baseRange.first, a)
+    private fun generateSubtractionQuestion(numberRange: IntRange): ArithmeticQuestion {
+        val a = Random.nextInt(numberRange.first + 5, numberRange.last + 1)
+        val b = Random.nextInt(numberRange.first, a)
         return ArithmeticQuestion("$a - $b = ?", a - b)
     }
 
-    private fun generateMultiplicationQuestion(difficulty: DynamicDifficulty): ArithmeticQuestion {
-        val a = Random.nextInt(difficulty.multiplierRange.first, difficulty.multiplierRange.last + 1)
-        val b = Random.nextInt(difficulty.multiplierRange.first, difficulty.multiplierRange.last + 1)
+    private fun generateMultiplicationQuestion(numberRange: IntRange): ArithmeticQuestion {
+        // For multiplication, use smaller factors to avoid extremely large products
+        val maxFactor = kotlin.math.sqrt(numberRange.last.toDouble()).toInt()
+        val a = Random.nextInt(2, maxFactor + 1)
+        val b = Random.nextInt(2, maxFactor + 1)
         return ArithmeticQuestion("$a × $b = ?", a * b)
     }
 
-    private fun generateDivisionQuestion(difficulty: DynamicDifficulty): ArithmeticQuestion {
-        val b = Random.nextInt(2, difficulty.multiplierRange.last)
-        val quotient = Random.nextInt(2, difficulty.baseRange.last / 2 + 1)
+    private fun generateDivisionQuestion(numberRange: IntRange): ArithmeticQuestion {
+        val maxFactor = kotlin.math.sqrt(numberRange.last.toDouble()).toInt()
+        val b = Random.nextInt(2, maxFactor)
+        val quotient = Random.nextInt(2, maxFactor)
         val a = b * quotient
         return ArithmeticQuestion("$a ÷ $b = ?", quotient)
     }
 
-    private fun generateFillInBlankQuestion(difficulty: DynamicDifficulty): ArithmeticQuestion {
+    private fun generateFillInBlankQuestion(numberRange: IntRange): ArithmeticQuestion {
         val operation = Random.nextInt(0, 4) // 0: +, 1: -, 2: ×, 3: ÷
         val position = Random.nextInt(0, 3) // 0: first number, 1: second number, 2: result
 
         return when (operation) {
             0 -> { // Addition
-                val a = Random.nextInt(difficulty.baseRange.first, difficulty.baseRange.last + 1)
-                val b = Random.nextInt(difficulty.baseRange.first, difficulty.baseRange.last + 1)
+                val a = Random.nextInt(numberRange.first, numberRange.last + 1)
+                val b = Random.nextInt(numberRange.first, numberRange.last + 1)
                 val sum = a + b
                 when (position) {
                     0 -> ArithmeticQuestion("? + $b = $sum", a)
@@ -324,8 +327,8 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
                 }
             }
             1 -> { // Subtraction
-                val a = Random.nextInt(difficulty.baseRange.first + 5, difficulty.baseRange.last + 1)
-                val b = Random.nextInt(difficulty.baseRange.first, a)
+                val a = Random.nextInt(numberRange.first + 5, numberRange.last + 1)
+                val b = Random.nextInt(numberRange.first, a)
                 val result = a - b
                 when (position) {
                     0 -> ArithmeticQuestion("? - $b = $result", a)
@@ -334,8 +337,9 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
                 }
             }
             2 -> { // Multiplication
-                val a = Random.nextInt(difficulty.multiplierRange.first, difficulty.multiplierRange.last + 1)
-                val b = Random.nextInt(difficulty.multiplierRange.first, difficulty.multiplierRange.last + 1)
+                val maxFactor = kotlin.math.sqrt(numberRange.last.toDouble()).toInt()
+                val a = Random.nextInt(2, maxFactor + 1)
+                val b = Random.nextInt(2, maxFactor + 1)
                 val product = a * b
                 when (position) {
                     0 -> ArithmeticQuestion("? × $b = $product", a)
@@ -344,8 +348,9 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
                 }
             }
             else -> { // Division
-                val b = Random.nextInt(2, difficulty.multiplierRange.last)
-                val quotient = Random.nextInt(2, difficulty.baseRange.last / 2 + 1)
+                val maxFactor = kotlin.math.sqrt(numberRange.last.toDouble()).toInt()
+                val b = Random.nextInt(2, maxFactor)
+                val quotient = Random.nextInt(2, maxFactor)
                 val a = b * quotient
                 when (position) {
                     0 -> ArithmeticQuestion("? ÷ $b = $quotient", a)

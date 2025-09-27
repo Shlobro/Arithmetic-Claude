@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.arithmiticpracticeclaude.data.GameRepository
 import com.example.arithmiticpracticeclaude.ui.GameViewModel
 import com.example.arithmiticpracticeclaude.ui.GameViewModelFactory
+import com.example.arithmiticpracticeclaude.data.League
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -68,8 +69,8 @@ fun SimpleGameScreen(
     }
 
     // Reset timer when new question appears
-    LaunchedEffect(currentQuestion) {
-        timeLeft = 30
+    LaunchedEffect(currentQuestion, gameState.totalScore) {
+        timeLeft = League.getTimerForScore(gameState.totalScore)
         questionStartTime = System.currentTimeMillis()
     }
 
@@ -90,7 +91,7 @@ fun SimpleGameScreen(
         TimerCard(
             timeLeft = timeLeft,
             isVisible = !showResult,
-            maxTime = 30
+            maxTime = League.getTimerForScore(gameState.totalScore)
         )
 
         // Enhanced Question Card
@@ -101,23 +102,13 @@ fun SimpleGameScreen(
             )
         }
 
-        // Enhanced Answer Input
+        // Enhanced Answer Input with Submit Button
         EnhancedAnswerInput(
             value = userAnswer,
             onValueChange = { userAnswer = it },
             enabled = !showResult,
+            canSubmit = userAnswer.isNotEmpty() && !showResult,
             onSubmit = {
-                val answer = userAnswer.toIntOrNull()
-                if (answer != null) {
-                    viewModel.submitAnswer(answer)
-                }
-            }
-        )
-
-        // Enhanced Submit Button
-        EnhancedSubmitButton(
-            enabled = userAnswer.isNotEmpty() && !showResult,
-            onClick = {
                 val answer = userAnswer.toIntOrNull()
                 if (answer != null) {
                     viewModel.submitAnswer(answer)
@@ -186,20 +177,21 @@ fun EnhancedHeaderCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Level and score display
+            // League and score display
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val currentLeague = League.getLeagueForScore(gameState.totalScore)
                     Text(
-                        text = "Level ${gameState.currentLevel}",
+                        text = "${currentLeague.icon} ${currentLeague.name}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = androidx.compose.ui.graphics.Color(currentLeague.color)
                     )
                     Text(
-                        text = "Dynamic",
+                        text = currentLeague.targetAge,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -380,6 +372,7 @@ fun EnhancedAnswerInput(
     value: String,
     onValueChange: (String) -> Unit,
     enabled: Boolean,
+    canSubmit: Boolean,
     onSubmit: () -> Unit
 ) {
     OutlinedTextField(
@@ -402,43 +395,22 @@ fun EnhancedAnswerInput(
                 tint = MaterialTheme.colorScheme.primary
             )
         },
+        trailingIcon = {
+            IconButton(
+                onClick = onSubmit,
+                enabled = canSubmit
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "Submit Answer",
+                    tint = if (canSubmit) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                )
+            }
+        },
         shape = RoundedCornerShape(16.dp)
     )
 }
 
-@Composable
-fun EnhancedSubmitButton(
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp),
-        enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary
-        )
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                text = "Submit Answer",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
 
 @Composable
 fun EnhancedResultCard(

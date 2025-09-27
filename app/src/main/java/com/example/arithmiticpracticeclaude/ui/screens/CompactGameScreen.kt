@@ -154,48 +154,40 @@ fun CompactGameScreen(
             )
         }
 
-        // Answer Input and Submit
-        Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            OutlinedTextField(
-                value = userAnswer,
-                onValueChange = { userAnswer = it },
-                label = { Text("Your Answer") },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontSize = 24.sp,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Medium
-                ),
-                singleLine = true,
-                enabled = !showResult,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(12.dp)
-            )
-
-            Button(
-                onClick = {
-                    hapticManager.buttonPressFeedback()
-                    val answer = userAnswer.toIntOrNull()
-                    if (answer != null) {
-                        viewModel.submitAnswer(answer)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                enabled = userAnswer.isNotEmpty() && !showResult,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = "Submit",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+        // Answer Input with Submit Button
+        OutlinedTextField(
+            value = userAnswer,
+            onValueChange = { userAnswer = it },
+            label = { Text("Your Answer") },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = androidx.compose.ui.text.TextStyle(
+                fontSize = 24.sp,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Medium
+            ),
+            singleLine = true,
+            enabled = !showResult,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            trailingIcon = {
+                IconButton(
+                    onClick = {
+                        hapticManager.buttonPressFeedback()
+                        val answer = userAnswer.toIntOrNull()
+                        if (answer != null) {
+                            viewModel.submitAnswer(answer)
+                        }
+                    },
+                    enabled = userAnswer.isNotEmpty() && !showResult
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Send,
+                        contentDescription = "Submit Answer",
+                        tint = if (userAnswer.isNotEmpty() && !showResult) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                }
+            },
+            shape = RoundedCornerShape(12.dp)
+        )
 
         // Auto-proceed to next question when result is shown
         LaunchedEffect(showResult) {
